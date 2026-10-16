@@ -1,48 +1,53 @@
 # clipboard-history
 
-Cronologia appunti in stile Windows (Win+V) per GNOME su X11. Un daemon registra
-ogni testo o immagine copiata; `Super+V` apre un popup vicino al puntatore con
-gli ultimi elementi: click o Invio incolla nella finestra attiva, si possono
-fissare (pin) o cancellare elementi, cercare nel testo, svuotare i non fissati.
-Sono tenuti 25 elementi non fissati; i fissati non scadono.
+Windows-style clipboard history (Win+V) for GNOME on X11. A daemon records every
+text or image you copy; `Super+V` opens a popup near the pointer with the latest
+items. Click or press Enter to paste into the active window. You can pin, delete
+or search items, and clear all unpinned ones. The 25 most recent unpinned items
+are kept; pinned items never expire.
 
-Dati in `~/.local/share/clipboard-history/` (`history.db` e `images/`).
+Data is stored in `~/.local/share/clipboard-history/` (`history.db` and `images/`).
 
-## Requisiti
+## Requirements
 
-- Ubuntu/GNOME in sessione **X11**
-- `python3-gi`, `gir1.2-gtk-4.0`, `xdotool` (nessuna dipendenza pip)
+- Ubuntu/GNOME in an **X11** session
+- `python3-gi`, `gir1.2-gtk-4.0`, `xdotool` (no pip dependencies)
+- `xclip` (optional, needed by terminal apps such as Claude Code to read images from the clipboard)
 
-## Installazione
+## Install
 
 ```sh
 ./install.sh
 ```
 
-Collega `bin/clipboard-history` in `~/.local/bin`, installa e avvia il servizio
-utente `clipboard-history.service`, sposta `Super+V` dal vassoio notifiche
-(resta `Super+M`) alla scorciatoia personalizzata "Clipboard history".
-Lo script è idempotente.
+Links `bin/clipboard-history` into `~/.local/bin`, installs and starts the user
+service `clipboard-history.service`, and moves `Super+V` from the notification
+tray (`Super+M` stays) to a custom shortcut "Clipboard history". The script is
+idempotent.
 
-Uso manuale: `clipboard-history daemon` (default) o `clipboard-history toggle`.
+Manual use: `clipboard-history daemon` (default) or `clipboard-history toggle`.
 
-## Disinstallazione
+## Uninstall
 
 ```sh
 ./uninstall.sh
 ```
 
-Ferma e rimuove il servizio, il link e la scorciatoia, restituisce `Super+V`
-al vassoio notifiche. La cronologia su disco viene conservata.
+Stops and removes the service, the link and the shortcut, and gives `Super+V`
+back to the notification tray. Clipboard history on disk is kept.
 
-## Test
+## Tests
 
 ```sh
 python3 -m pytest tests/ -q
 ```
 
-## Limite Wayland
+## Wayland limitation
 
-Su Wayland l'incolla automatico non funziona: `xdotool` non può attivare
-finestre né inviare Ctrl+V, e la finestra non può essere posizionata. Non è
-gestito: la sessione supportata è solo X11.
+On Wayland automatic pasting does not work: `xdotool` cannot activate windows or
+send Ctrl+V, and the popup cannot be positioned. This is not handled; X11 is the
+only supported session.
+
+## License
+
+MIT, see [LICENSE](LICENSE).

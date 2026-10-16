@@ -15,6 +15,7 @@ KB_SCHEMA="$MK_SCHEMA.custom-keybinding:$KB_PATH"
 for cmd in python3 xdotool systemctl gsettings; do
     command -v "$cmd" >/dev/null || { echo "missing dependency: $cmd" >&2; exit 1; }
 done
+command -v xclip >/dev/null || echo "note: xclip not found; terminal apps may not read images from the clipboard (sudo apt install xclip)" >&2
 python3 -c "import gi; gi.require_version('Gtk', '4.0'); from gi.repository import Gtk" \
     || { echo "missing PyGObject/GTK4 (python3-gi, gir1.2-gtk-4.0)" >&2; exit 1; }
 
