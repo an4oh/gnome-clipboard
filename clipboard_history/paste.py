@@ -1,4 +1,6 @@
 """Thin wrappers around xdotool. Every failure is logged to stderr, never raised."""
+import ctypes
+import ctypes.util
 import subprocess
 import sys
 
@@ -75,3 +77,40 @@ def send_paste(target_window):
     if target_window:
         activate_window(target_window, sync=True)
     _run("key", "--clearmodifiers", "ctrl+v")
+
+
+_BUTTON1_MASK = 1 << 8
+_x11 = None  # (libX11, Display*, root) once opened, False if unavailable
+
+
+def button1_pressed():
+    """Real state of mouse button 1 via XQueryPointer (valid even while the
+    window manager holds a grab), or None if X11 is not reachable."""
+    global _x11
+    if _x11 is None:
+        _x11 = False
+        try:
+            lib = ctypes.cdll.LoadLibrary(ctypes.util.find_library("X11") or "libX11.so.6")
+            lib.XOpenDisplay.restype = ctypes.c_void_p
+            lib.XOpenDisplay.argtypes = [ctypes.c_char_p]
+            lib.XDefaultRootWindow.restype = ctypes.c_ulong
+            lib.XDefaultRootWindow.argtypes = [ctypes.c_void_p]
+            lib.XQueryPointer.argtypes = [ctypes.c_void_p, ctypes.c_ulong] + [ctypes.c_void_p] * 7
+            display = lib.XOpenDisplay(None)
+            if display:
+                _x11 = (lib, display, lib.XDefaultRootWindow(display))
+            else:
+                _log("XOpenDisplay failed")
+        except (OSError, AttributeError) as e:
+            _log(f"libX11 not available: {e}")
+    if not _x11:
+        return None
+    lib, display, root = _x11
+    win = ctypes.c_ulong()
+    coord = ctypes.c_int()
+    mask = ctypes.c_uint()
+    ref = ctypes.byref
+    if not lib.XQueryPointer(display, root, ref(win), ref(win), ref(coord), ref(coord),
+                             ref(coord), ref(coord), ref(mask)):
+        return None
+    return bool(mask.value & _BUTTON1_MASK)

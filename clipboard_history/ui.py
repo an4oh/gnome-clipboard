@@ -30,6 +30,11 @@ PLACE_FALLBACK_MS = 150
 PLACE_CHECK_MS = 15
 PLACE_MAX_CHECKS = 20
 PLACE_STABLE_CHECKS = 2
+# Mutter's move-grab (dragging the header) steals focus from the popup: on
+# focus loss wait a bit and check the real mouse button state before hiding.
+HIDE_CHECK_MS = 60
+# A press on the header this recent before the focus loss starts a drag.
+DRAG_PRESS_WINDOW_S = 1.0
 
 CSS = b"""
 .clip-card { padding: 8px; margin: 4px 6px; }
@@ -65,6 +70,10 @@ class PopupWindow(Gtk.Window):
         self._pending_pointer = None
         self._placing = False
         self._show_gen = 0  # invalidates placement timers of earlier shows
+        self._hide_pending = False
+        self._dragging = False
+        self._header_press_at = None
+        self._focus_lost_at = 0.0
 
         Gtk.Window.set_default_icon_name(APP_ICON)
         self.set_icon_name(APP_ICON)
@@ -93,7 +102,14 @@ class PopupWindow(Gtk.Window):
         clear_btn.connect("clicked", self._on_clear_all)
         header.append(title)
         header.append(clear_btn)
-        root.append(header)
+        # Dragging the header moves the window (GTK4 has no title bar here).
+        handle = Gtk.WindowHandle(child=header)
+        press = Gtk.GestureClick()
+        press.set_propagation_phase(Gtk.PropagationPhase.CAPTURE)
+        press.connect("pressed", self._on_header_pressed)
+        handle.add_controller(press)
+        self._handle = handle
+        root.append(handle)
 
         self.search = Gtk.SearchEntry(placeholder_text="Cerca")
         self.search.connect("search-changed", lambda *_: self.refresh())
@@ -137,6 +153,8 @@ class PopupWindow(Gtk.Window):
         self.search.set_text("")
         self.refresh()
         self._was_active = False
+        self._reset_drag_state()
+        self._reset_header_gestures()
         # Show it fully transparent, move it once mapped, then reveal it: the
         # user never sees it at Mutter's position nor the zoom-in animation.
         self.set_opacity(0.0)
@@ -149,6 +167,7 @@ class PopupWindow(Gtk.Window):
 
     def hide_popup(self):
         self._was_active = False
+        self._reset_drag_state()
         self._placing = False
         self._pending_pointer = None
         self._show_gen += 1
@@ -203,6 +222,10 @@ class PopupWindow(Gtk.Window):
 
     def _reveal(self, xid):
         self.set_opacity(1.0)
+        # GTK may keep is-active from the previous show (no focus-out after the
+        # unmap), so no notify fires on this show: seed it from the real state.
+        if self.is_active():
+            self._was_active = True
         # Mutter may refuse focus to a window shown from a background daemon;
         # an explicit activation via _NET_ACTIVE_WINDOW is honoured.
         if xid is not None and not self.is_active():
@@ -219,11 +242,68 @@ class PopupWindow(Gtk.Window):
                 break
         return x, y
 
+    def _reset_drag_state(self):
+        self._hide_pending = False
+        self._dragging = False
+        self._header_press_at = None
+
+    def _reset_header_gestures(self):
+        # The button release of a move-grab goes to Mutter, not to us: the
+        # header gestures stay "pressed" and would ignore the next press.
+        controllers = self._handle.observe_controllers()
+        for i in range(controllers.get_n_items()):
+            controllers.get_item(i).reset()
+
+    def _on_header_pressed(self, *_):
+        self._header_press_at = time.monotonic()
+
     def _on_active_changed(self, *_):
         if self.is_active():
             self._was_active = True
-        elif self._was_active and self.get_visible():
-            self.hide_popup()
+        elif self._was_active and self.get_visible() and not self._hide_pending:
+            self._hide_pending = True
+            self._focus_lost_at = time.monotonic()
+            GLib.timeout_add(HIDE_CHECK_MS, self._maybe_hide, self._show_gen)
+
+    def _button1_pressed(self):
+        # GTK's own pointer state goes stale after Mutter's move-grab (the
+        # release is never delivered to us), so ask the X server directly.
+        pressed = paste.button1_pressed()
+        if pressed is not None:
+            return pressed
+        surface = self.get_surface()
+        seat = Gdk.Display.get_default().get_default_seat()
+        device = seat.get_pointer() if seat is not None else None
+        if surface is None or device is None:
+            return False
+        mask = surface.get_device_position(device)[-1]
+        return bool(mask & Gdk.ModifierType.BUTTON1_MASK)
+
+    def _maybe_hide(self, gen):
+        """Hide after a focus loss, unless it is a header drag (move-grab)."""
+        if gen != self._show_gen or not self.get_visible() or self.is_active():
+            if self._dragging:
+                self._reset_header_gestures()
+            self._reset_drag_state()
+            return False
+        if self._button1_pressed():
+            pressed_at = self._header_press_at
+            if self._dragging or (
+                pressed_at is not None
+                and 0 <= self._focus_lost_at - pressed_at < DRAG_PRESS_WINDOW_S
+            ):
+                self._dragging = True
+                return True  # keep polling until the button is released
+        elif self._dragging:
+            # Drag finished: the popup stays where it was dropped, refocus it.
+            self._reset_drag_state()
+            self._reset_header_gestures()
+            xid = self._xid()
+            if xid is not None:
+                paste.activate_window(xid)
+            return False
+        self.hide_popup()
+        return False
 
     def _on_close_request(self, *_):
         self.hide_popup()
