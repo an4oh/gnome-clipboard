@@ -156,3 +156,23 @@ def test_find_by_hash(store):
     a = store.add_text("uno")
     assert store.find_by_hash(content_hash("uno".encode())).id == a
     assert store.find_by_hash("nope") is None
+
+
+def test_get_setting_default(store):
+    assert store.get_setting("missing") is None
+    assert store.get_setting("missing", "x") == "x"
+
+
+def test_set_and_get_setting(store):
+    store.set_setting("window_width", 400)
+    assert store.get_setting("window_width") == "400"
+
+
+def test_set_setting_overwrites_and_persists(tmp_path):
+    s = Storage(tmp_path / "h.db", tmp_path / "images")
+    s.set_setting("k", "a")
+    s.set_setting("k", "b")
+    s.close()
+    s2 = Storage(tmp_path / "h.db", tmp_path / "images")
+    assert s2.get_setting("k") == "b"
+    s2.close()

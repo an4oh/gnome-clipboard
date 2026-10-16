@@ -23,6 +23,10 @@ CREATE TABLE IF NOT EXISTS items (
     created_at REAL NOT NULL,
     last_used_at REAL NOT NULL
 );
+CREATE TABLE IF NOT EXISTS settings (
+    key TEXT PRIMARY KEY,
+    value TEXT
+);
 """
 
 ORDER = "ORDER BY pinned DESC, last_used_at DESC, id DESC"
@@ -93,7 +97,19 @@ class Storage:
             rows = self.conn.execute(f"SELECT * FROM items {ORDER}").fetchall()
         return [self._item(r) for r in rows]
 
+    def get_setting(self, key, default=None):
+        row = self.conn.execute("SELECT value FROM settings WHERE key = ?", (key,)).fetchone()
+        return default if row is None else row["value"]
+
     # --- writes ------------------------------------------------------------
+
+    def set_setting(self, key, value):
+        self.conn.execute(
+            "INSERT INTO settings (key, value) VALUES (?, ?)"
+            " ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+            (key, None if value is None else str(value)),
+        )
+        self.conn.commit()
 
     def add(self, kind, h, text=None, image_path=None):
         """Insert an item, or move an existing one with the same hash to the top.

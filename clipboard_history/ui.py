@@ -19,6 +19,9 @@ except (ValueError, ImportError):  # not an X11-capable GTK build
     GdkX11 = None
 
 WIDTH, HEIGHT = 360, 480
+# Smallest size accepted from the saved settings (guards against a corrupt
+# or absurd value leaving the popup unusable).
+MIN_WIDTH, MIN_HEIGHT = 240, 200
 THUMB_W, THUMB_H = 320, 120
 PASTE_DELAY_MS = 80
 APP_ICON = "org.an4oh.ClipboardHistory"
@@ -30,16 +33,18 @@ PLACE_FALLBACK_MS = 150
 PLACE_CHECK_MS = 15
 PLACE_MAX_CHECKS = 20
 PLACE_STABLE_CHECKS = 2
-# Mutter's move-grab (dragging the header) steals focus from the popup: on
-# focus loss wait a bit and check the real mouse button state before hiding.
+# Mutter's move/resize grabs (dragging the header or the resize grip) steal
+# focus from the popup: on focus loss wait a bit and check the real mouse
+# button state before hiding.
 HIDE_CHECK_MS = 60
-# A press on the header this recent before the focus loss starts a drag.
+# A press on the header or grip this recent before the focus loss starts a grab.
 DRAG_PRESS_WINDOW_S = 1.0
 
 CSS = b"""
 .clip-card { padding: 8px; margin: 4px 6px; }
 .clip-time { font-size: smaller; opacity: 0.7; }
 .clip-title { font-weight: bold; }
+.resize-grip { opacity: 0.5; font-size: 10px; padding: 0 1px 0 0; }
 """
 
 
@@ -72,15 +77,19 @@ class PopupWindow(Gtk.Window):
         self._show_gen = 0  # invalidates placement timers of earlier shows
         self._hide_pending = False
         self._dragging = False
-        self._header_press_at = None
+        self._grab_press_at = None
         self._focus_lost_at = 0.0
 
         Gtk.Window.set_default_icon_name(APP_ICON)
         self.set_icon_name(APP_ICON)
 
         self.set_decorated(False)
-        self.set_resizable(False)
-        self.set_default_size(WIDTH, HEIGHT)
+        self.set_resizable(True)
+        self.set_size_request(MIN_WIDTH, MIN_HEIGHT)
+        self.set_default_size(
+            self._size_setting("window_width", WIDTH, MIN_WIDTH),
+            self._size_setting("window_height", HEIGHT, MIN_HEIGHT),
+        )
 
         provider = Gtk.CssProvider()
         provider.load_from_data(CSS)
@@ -93,7 +102,19 @@ class PopupWindow(Gtk.Window):
         root.set_margin_bottom(8)
         root.set_margin_start(8)
         root.set_margin_end(8)
-        self.set_child(root)
+        # An undecorated window has no resize borders (neither GTK nor Mutter
+        # draws them), so a grip in the bottom-right corner starts the resize.
+        overlay = Gtk.Overlay(child=root)
+        self.set_child(overlay)
+        grip = Gtk.Label(label="\u25e2", halign=Gtk.Align.END, valign=Gtk.Align.END)
+        grip.add_css_class("resize-grip")
+        grip.set_cursor_from_name("se-resize")
+        grip.set_tooltip_text("Ridimensiona")
+        grip_press = Gtk.GestureClick(button=Gdk.BUTTON_PRIMARY)
+        grip_press.connect("pressed", self._on_grip_pressed)
+        grip.add_controller(grip_press)
+        overlay.add_overlay(grip)
+        self._grip = grip
 
         header = Gtk.Box(spacing=6)
         title = Gtk.Label(label="Appunti", xalign=0, hexpand=True)
@@ -106,7 +127,7 @@ class PopupWindow(Gtk.Window):
         handle = Gtk.WindowHandle(child=header)
         press = Gtk.GestureClick()
         press.set_propagation_phase(Gtk.PropagationPhase.CAPTURE)
-        press.connect("pressed", self._on_header_pressed)
+        press.connect("pressed", self._on_grab_pressed)
         handle.add_controller(press)
         self._handle = handle
         root.append(handle)
@@ -166,6 +187,7 @@ class PopupWindow(Gtk.Window):
         GLib.timeout_add(PLACE_FALLBACK_MS, self._place_and_focus)
 
     def hide_popup(self):
+        self._save_size()
         self._was_active = False
         self._reset_drag_state()
         self._placing = False
@@ -173,6 +195,32 @@ class PopupWindow(Gtk.Window):
         self._show_gen += 1
         self.set_opacity(0.0)
         self.set_visible(False)
+
+    def _size_setting(self, key, default, minimum):
+        try:
+            value = int(self.storage.get_setting(key))
+        except (TypeError, ValueError):
+            return default
+        return value if value >= minimum else default
+
+    def _current_size(self):
+        # The allocated size is exact while mapped; otherwise use the default
+        # size, which GTK4 keeps in sync with user resizes.
+        if self.get_mapped() and self.get_width() > 0 and self.get_height() > 0:
+            return self.get_width(), self.get_height()
+        return self.get_default_size()
+
+    def _save_size(self):
+        if not self.get_visible() or not self.get_mapped():
+            return
+        width, height = self._current_size()
+        if width <= 0 or height <= 0:
+            return
+        # Keep it as the default too, so the next map uses the same size.
+        self.set_default_size(width, height)
+        for key, value in (("window_width", width), ("window_height", height)):
+            if self.storage.get_setting(key) != str(value):
+                self.storage.set_setting(key, value)
 
     def _on_realize(self, *_):
         surface = self.get_surface()
@@ -232,30 +280,52 @@ class PopupWindow(Gtk.Window):
             paste.activate_window(xid)
 
     def _clamp_to_monitor(self, x, y):
+        width, height = self._current_size()
         display = Gdk.Display.get_default()
         monitors = display.get_monitors()
         for i in range(monitors.get_n_items()):
             g = monitors.get_item(i).get_geometry()
             if g.x <= x < g.x + g.width and g.y <= y < g.y + g.height:
-                x = max(g.x, min(x, g.x + g.width - WIDTH))
-                y = max(g.y, min(y, g.y + g.height - HEIGHT))
+                x = max(g.x, min(x, g.x + g.width - width))
+                y = max(g.y, min(y, g.y + g.height - height))
                 break
         return x, y
 
     def _reset_drag_state(self):
         self._hide_pending = False
         self._dragging = False
-        self._header_press_at = None
+        self._grab_press_at = None
 
     def _reset_header_gestures(self):
-        # The button release of a move-grab goes to Mutter, not to us: the
-        # header gestures stay "pressed" and would ignore the next press.
-        controllers = self._handle.observe_controllers()
-        for i in range(controllers.get_n_items()):
-            controllers.get_item(i).reset()
+        # The button release of a move/resize grab goes to Mutter, not to us:
+        # the header and grip gestures stay "pressed" and would ignore the
+        # next press.
+        for widget in (self._handle, self._grip):
+            controllers = widget.observe_controllers()
+            for i in range(controllers.get_n_items()):
+                controllers.get_item(i).reset()
 
-    def _on_header_pressed(self, *_):
-        self._header_press_at = time.monotonic()
+    def _on_grab_pressed(self, *_):
+        self._grab_press_at = time.monotonic()
+
+    def _on_grip_pressed(self, gesture, _n_press, x, y):
+        self._on_grab_pressed()
+        surface = self.get_surface()
+        if not isinstance(surface, Gdk.Toplevel):
+            return
+        gesture.set_state(Gtk.EventSequenceState.CLAIMED)
+        # begin_resize wants surface coordinates: grip -> window -> surface.
+        # PyGObject returns (x, y), or None if the widgets are unrelated.
+        wx, wy = self._grip.translate_coordinates(self, x, y) or (x, y)
+        tx, ty = self.get_surface_transform()
+        surface.begin_resize(
+            Gdk.SurfaceEdge.SOUTH_EAST,
+            gesture.get_current_event_device(),
+            gesture.get_current_button(),
+            wx + tx,
+            wy + ty,
+            gesture.get_current_event_time(),
+        )
 
     def _on_active_changed(self, *_):
         if self.is_active():
@@ -266,7 +336,7 @@ class PopupWindow(Gtk.Window):
             GLib.timeout_add(HIDE_CHECK_MS, self._maybe_hide, self._show_gen)
 
     def _button1_pressed(self):
-        # GTK's own pointer state goes stale after Mutter's move-grab (the
+        # GTK's own pointer state goes stale after Mutter's grabs (the
         # release is never delivered to us), so ask the X server directly.
         pressed = paste.button1_pressed()
         if pressed is not None:
@@ -280,14 +350,15 @@ class PopupWindow(Gtk.Window):
         return bool(mask & Gdk.ModifierType.BUTTON1_MASK)
 
     def _maybe_hide(self, gen):
-        """Hide after a focus loss, unless it is a header drag (move-grab)."""
+        """Hide after a focus loss, unless it is a header drag or grip resize
+        (Mutter move/resize grab)."""
         if gen != self._show_gen or not self.get_visible() or self.is_active():
             if self._dragging:
                 self._reset_header_gestures()
             self._reset_drag_state()
             return False
         if self._button1_pressed():
-            pressed_at = self._header_press_at
+            pressed_at = self._grab_press_at
             if self._dragging or (
                 pressed_at is not None
                 and 0 <= self._focus_lost_at - pressed_at < DRAG_PRESS_WINDOW_S
@@ -295,7 +366,7 @@ class PopupWindow(Gtk.Window):
                 self._dragging = True
                 return True  # keep polling until the button is released
         elif self._dragging:
-            # Drag finished: the popup stays where it was dropped, refocus it.
+            # Grab finished: the popup keeps its new position/size, refocus it.
             self._reset_drag_state()
             self._reset_header_gestures()
             xid = self._xid()
