@@ -10,7 +10,7 @@ import gi
 
 gi.require_version("Gtk", "4.0")
 gi.require_version("Gdk", "4.0")
-from gi.repository import Gdk, Gio, Gtk  # noqa: E402
+from gi.repository import Gdk, Gio, GLib, Gtk  # noqa: E402
 
 from .monitor import ClipboardMonitor  # noqa: E402
 from .storage import Storage, default_data_dir  # noqa: E402
@@ -64,6 +64,9 @@ def main(argv=None):
     if len(argv) > 2 or (len(argv) == 2 and argv[1] not in COMMANDS):
         print(USAGE, file=sys.stderr)
         return 2
+    # GTK uses the program name as WM_CLASS on X11: match the .desktop file's
+    # StartupWMClass so GNOME Shell shows the app icon and name.
+    GLib.set_prgname(APP_ID)
     app = ClipboardHistoryApp()
     if len(argv) == 2 and argv[1] == "toggle":
         app.register(None)

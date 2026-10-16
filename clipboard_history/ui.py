@@ -21,7 +21,15 @@ except (ValueError, ImportError):  # not an X11-capable GTK build
 WIDTH, HEIGHT = 360, 480
 THUMB_W, THUMB_H = 320, 120
 PASTE_DELAY_MS = 80
-MOVE_DELAY_MS = 30
+APP_ICON = "org.an4oh.ClipboardHistory"
+# Fallback in case the surface "mapped" notification never arrives.
+PLACE_FALLBACK_MS = 150
+# Mutter places a newly mapped window on its own schedule and may override an
+# early move (or drop a move to the position the window had when hidden), so
+# the position is checked and re-applied until it holds, before revealing.
+PLACE_CHECK_MS = 15
+PLACE_MAX_CHECKS = 20
+PLACE_STABLE_CHECKS = 2
 
 CSS = b"""
 .clip-card { padding: 8px; margin: 4px 6px; }
@@ -54,6 +62,12 @@ class PopupWindow(Gtk.Window):
         self.clipboard = Gdk.Display.get_default().get_clipboard()
         self.target_window = None
         self._was_active = False
+        self._pending_pointer = None
+        self._placing = False
+        self._show_gen = 0  # invalidates placement timers of earlier shows
+
+        Gtk.Window.set_default_icon_name(APP_ICON)
+        self.set_icon_name(APP_ICON)
 
         self.set_decorated(False)
         self.set_resizable(False)
@@ -102,6 +116,13 @@ class PopupWindow(Gtk.Window):
         self.connect("notify::is-active", self._on_active_changed)
         self.connect("close-request", self._on_close_request)
 
+        # Realize once up front: the X11 surface (and its xid) then exists
+        # before the first present(), which makes the first show faster and
+        # lets us watch for the map to place the window before revealing it.
+        self.set_opacity(0.0)
+        self.connect("realize", self._on_realize)
+        self.realize()
+
     # --- show / hide -------------------------------------------------------
 
     def toggle(self):
@@ -116,13 +137,32 @@ class PopupWindow(Gtk.Window):
         self.search.set_text("")
         self.refresh()
         self._was_active = False
+        # Show it fully transparent, move it once mapped, then reveal it: the
+        # user never sees it at Mutter's position nor the zoom-in animation.
+        self.set_opacity(0.0)
+        self._pending_pointer = pointer
+        self._placing = True
+        self._show_gen += 1
         self.present()
         self.search.grab_focus()
-        GLib.timeout_add(MOVE_DELAY_MS, self._place_and_focus, pointer)
+        GLib.timeout_add(PLACE_FALLBACK_MS, self._place_and_focus)
 
     def hide_popup(self):
         self._was_active = False
+        self._placing = False
+        self._pending_pointer = None
+        self._show_gen += 1
+        self.set_opacity(0.0)
         self.set_visible(False)
+
+    def _on_realize(self, *_):
+        surface = self.get_surface()
+        if surface is not None:
+            surface.connect("notify::mapped", self._on_surface_mapped)
+
+    def _on_surface_mapped(self, surface, _pspec):
+        if surface.get_mapped() and self._placing:
+            GLib.idle_add(self._place_and_focus)
 
     def _xid(self):
         surface = self.get_surface()
@@ -130,21 +170,43 @@ class PopupWindow(Gtk.Window):
             return None
         return surface.get_xid()
 
-    def _place_and_focus(self, pointer):
-        """GTK4 cannot move windows: place it with xdotool after it is mapped."""
-        if not self.get_visible():
+    def _place_and_focus(self):
+        """GTK4 cannot move windows: place it with xdotool once it is mapped,
+        then make it visible. Runs once per show (mapped signal or fallback)."""
+        if not self._placing or not self.get_visible():
             return False
+        self._placing = False
+        pointer, self._pending_pointer = self._pending_pointer, None
         xid = self._xid()
-        if xid is None:
+        if xid is None or not pointer:
+            self._reveal(xid)
             return False
-        if pointer:
-            x, y = self._clamp_to_monitor(*pointer)
-            paste.move_window(xid, x, y)
+        target = self._clamp_to_monitor(*pointer)
+        paste.move_window(xid, *target, sync=True)
+        state = {"checks": 0, "stable": 0}
+        GLib.timeout_add(PLACE_CHECK_MS, self._check_placement, xid, target, state, self._show_gen)
+        return False
+
+    def _check_placement(self, xid, target, state, gen):
+        if gen != self._show_gen or not self.get_visible():
+            return False
+        state["checks"] += 1
+        if paste.get_window_position(xid) == target:
+            state["stable"] += 1
+        else:
+            state["stable"] = 0
+            paste.move_window(xid, *target, sync=True)
+        if state["stable"] >= PLACE_STABLE_CHECKS or state["checks"] >= PLACE_MAX_CHECKS:
+            self._reveal(xid)
+            return False
+        return True
+
+    def _reveal(self, xid):
+        self.set_opacity(1.0)
         # Mutter may refuse focus to a window shown from a background daemon;
         # an explicit activation via _NET_ACTIVE_WINDOW is honoured.
-        if not self.is_active():
+        if xid is not None and not self.is_active():
             paste.activate_window(xid)
-        return False
 
     def _clamp_to_monitor(self, x, y):
         display = Gdk.Display.get_default()

@@ -43,8 +43,24 @@ def get_mouse_location():
         return None
 
 
-def move_window(xid, x, y):
-    _run("windowmove", str(xid), str(x), str(y))
+def get_window_position(xid):
+    """Return (x, y) of the window in root coordinates, or None."""
+    out = _run("getwindowgeometry", "--shell", str(xid))
+    if not out:
+        return None
+    values = dict(line.split("=", 1) for line in out.splitlines() if "=" in line)
+    try:
+        return int(values["X"]), int(values["Y"])
+    except (KeyError, ValueError):
+        _log(f"unexpected getwindowgeometry output: {out!r}")
+        return None
+
+
+def move_window(xid, x, y, sync=False):
+    args = ["windowmove"]
+    if sync:
+        args.append("--sync")
+    _run(*args, str(xid), str(x), str(y))
 
 
 def activate_window(xid, sync=False):

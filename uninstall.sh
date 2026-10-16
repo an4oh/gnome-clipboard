@@ -6,6 +6,9 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$(readlink -f "$0")")" && pwd)"
 BIN="$HOME/.local/bin/clipboard-history"
 UNIT="$HOME/.config/systemd/user/clipboard-history.service"
+APP_ID="org.an4oh.ClipboardHistory"
+DESKTOP="$HOME/.local/share/applications/$APP_ID.desktop"
+ICON="$HOME/.local/share/icons/hicolor/scalable/apps/$APP_ID.svg"
 
 MK_SCHEMA="org.gnome.settings-daemon.plugins.media-keys"
 KB_PATH="/org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/custom-clipboard-history/"
@@ -38,6 +41,12 @@ if [ -L "$BIN" ] && [ "$(readlink -f "$BIN")" = "$ROOT/bin/clipboard-history" ];
     rm -f "$BIN"
 elif [ -e "$BIN" ]; then
     echo "   $BIN is not our symlink, left untouched" >&2
+fi
+
+echo "-> removing desktop entry and icon"
+rm -f "$DESKTOP" "$ICON"
+if command -v update-desktop-database >/dev/null; then
+    update-desktop-database "$HOME/.local/share/applications" 2>/dev/null || true
 fi
 
 echo "-> restoring keybindings"

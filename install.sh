@@ -7,6 +7,10 @@ BIN_DIR="$HOME/.local/bin"
 BIN="$BIN_DIR/clipboard-history"
 UNIT_DIR="$HOME/.config/systemd/user"
 UNIT="$UNIT_DIR/clipboard-history.service"
+APP_ID="org.an4oh.ClipboardHistory"
+APPS_DIR="$HOME/.local/share/applications"
+ICON_ROOT="$HOME/.local/share/icons/hicolor"
+ICON_DIR="$ICON_ROOT/scalable/apps"
 
 MK_SCHEMA="org.gnome.settings-daemon.plugins.media-keys"
 KB_PATH="/org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/custom-clipboard-history/"
@@ -40,6 +44,17 @@ echo "-> linking $BIN"
 mkdir -p "$BIN_DIR"
 chmod +x "$ROOT/bin/clipboard-history"
 ln -sfn "$ROOT/bin/clipboard-history" "$BIN"
+
+echo "-> installing desktop entry and icon"
+mkdir -p "$APPS_DIR" "$ICON_DIR"
+install -m 644 "$ROOT/data/$APP_ID.desktop" "$APPS_DIR/$APP_ID.desktop"
+install -m 644 "$ROOT/data/$APP_ID.svg" "$ICON_DIR/$APP_ID.svg"
+if command -v update-desktop-database >/dev/null; then
+    update-desktop-database "$APPS_DIR" || true
+fi
+if command -v gtk-update-icon-cache >/dev/null; then
+    gtk-update-icon-cache -q -t "$ICON_ROOT" || true
+fi
 
 echo "-> writing $UNIT"
 mkdir -p "$UNIT_DIR"

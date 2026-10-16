@@ -22,8 +22,11 @@ Data is stored in `~/.local/share/clipboard-history/` (`history.db` and `images/
 
 Links `bin/clipboard-history` into `~/.local/bin`, installs and starts the user
 service `clipboard-history.service`, and moves `Super+V` from the notification
-tray (`Super+M` stays) to a custom shortcut "Clipboard history". The script is
-idempotent.
+tray (`Super+M` stays) to a custom shortcut "Clipboard history". It also
+installs `data/org.an4oh.ClipboardHistory.desktop` into
+`~/.local/share/applications` and its SVG icon into
+`~/.local/share/icons/hicolor/scalable/apps`, so the dash shows the app icon.
+The script is idempotent.
 
 Manual use: `clipboard-history daemon` (default) or `clipboard-history toggle`.
 

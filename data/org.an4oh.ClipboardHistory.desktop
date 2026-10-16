@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=Clipboard history
+Comment=Browse and paste previously copied text and images
+Exec=clipboard-history toggle
+Icon=org.an4oh.ClipboardHistory
+Terminal=false
+Categories=Utility;
+StartupWMClass=org.an4oh.ClipboardHistory
+X-GNOME-UsesNotifications=false

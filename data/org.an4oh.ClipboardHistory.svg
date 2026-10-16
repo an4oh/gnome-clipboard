@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128">
+  <!-- board -->
+  <rect x="20" y="16" width="88" height="104" rx="10" fill="#1a5fb4"/>
+  <rect x="20" y="12" width="88" height="104" rx="10" fill="#3584e4"/>
+  <!-- sheet -->
+  <rect x="32" y="28" width="64" height="78" rx="4" fill="#ffffff"/>
+  <!-- text lines -->
+  <rect x="42" y="46" width="44" height="6" rx="3" fill="#9a9996"/>
+  <rect x="42" y="62" width="44" height="6" rx="3" fill="#9a9996"/>
+  <rect x="42" y="78" width="28" height="6" rx="3" fill="#9a9996"/>
+  <!-- clip -->
+  <rect x="44" y="4" width="40" height="18" rx="5" fill="#77767b"/>
+  <rect x="44" y="4" width="40" height="14" rx="5" fill="#c0bfbc"/>
+  <rect x="56" y="8" width="16" height="5" rx="2.5" fill="#77767b"/>
+</svg>
