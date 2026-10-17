@@ -52,6 +52,10 @@ python3 -m pytest tests/ -q
 On Wayland `xdotool` cannot focus windows or send Ctrl+V, so automatic pasting
 does not work. Not handled: X11 is the only supported session.
 
+## AI full disclosure
+
+This software was developed with extensive use of an AI coding agent (Claude Code), with a human leading the idea, the design decisions, the testing on a real GNOME session, and the debugging. I say this openly because it shaped how the project was built. If you are not comfortable with AI-developed code, this software is not for you.
+
 ## License
 
 MIT, see [LICENSE](LICENSE).
