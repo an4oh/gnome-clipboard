@@ -1,17 +1,17 @@
 #!/usr/bin/env bash
-# Remove clipboard-history for the current user (idempotent). Data in
-# ~/.local/share/clipboard-history is kept.
+# Remove gnome-clipboard for the current user (idempotent). Data in
+# ~/.local/share/gnome-clipboard is kept.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$(readlink -f "$0")")" && pwd)"
-BIN="$HOME/.local/bin/clipboard-history"
-UNIT="$HOME/.config/systemd/user/clipboard-history.service"
-APP_ID="org.an4oh.ClipboardHistory"
+BIN="$HOME/.local/bin/gnome-clipboard"
+UNIT="$HOME/.config/systemd/user/gnome-clipboard.service"
+APP_ID="org.an4oh.GnomeClipboard"
 DESKTOP="$HOME/.local/share/applications/$APP_ID.desktop"
 ICON="$HOME/.local/share/icons/hicolor/scalable/apps/$APP_ID.svg"
 
 MK_SCHEMA="org.gnome.settings-daemon.plugins.media-keys"
-KB_PATH="/org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/custom-clipboard-history/"
+KB_PATH="/org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/custom-gnome-clipboard/"
 KB_SCHEMA="$MK_SCHEMA.custom-keybinding:$KB_PATH"
 
 gv_list() {
@@ -31,13 +31,13 @@ PY
 }
 
 echo "-> stopping service"
-systemctl --user disable --now clipboard-history.service 2>/dev/null || true
+systemctl --user disable --now gnome-clipboard.service 2>/dev/null || true
 rm -f "$UNIT"
 systemctl --user daemon-reload
-systemctl --user reset-failed clipboard-history.service 2>/dev/null || true
+systemctl --user reset-failed gnome-clipboard.service 2>/dev/null || true
 
 echo "-> removing $BIN"
-if [ -L "$BIN" ] && [ "$(readlink -f "$BIN")" = "$ROOT/bin/clipboard-history" ]; then
+if [ -L "$BIN" ] && [ "$(readlink -f "$BIN")" = "$ROOT/bin/gnome-clipboard" ]; then
     rm -f "$BIN"
 elif [ -e "$BIN" ]; then
     echo "   $BIN is not our symlink, left untouched" >&2
@@ -58,4 +58,4 @@ done
 tray="$(gsettings get org.gnome.shell.keybindings toggle-message-tray)"
 gsettings set org.gnome.shell.keybindings toggle-message-tray "$(gv_list "$tray" add '<Super>v')"
 
-echo "done (history kept in ~/.local/share/clipboard-history)"
+echo "done (history kept in ~/.local/share/gnome-clipboard)"

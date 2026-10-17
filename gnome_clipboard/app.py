@@ -1,7 +1,7 @@
 """Single-instance GTK application.
 
 The first instance is the daemon: it owns the clipboard monitor and a hidden
-popup window. Running `clipboard-history toggle` starts a second instance that
+popup window. Running `gnome-clipboard toggle` starts a second instance that
 forwards its command line to the daemon over D-Bus and exits.
 """
 import sys
@@ -16,12 +16,12 @@ from .monitor import ClipboardMonitor  # noqa: E402
 from .storage import Storage, default_data_dir  # noqa: E402
 from .ui import PopupWindow  # noqa: E402
 
-APP_ID = "org.an4oh.ClipboardHistory"
+APP_ID = "org.an4oh.GnomeClipboard"
 COMMANDS = ("daemon", "toggle")
-USAGE = "usage: clipboard-history [daemon|toggle]"
+USAGE = "usage: gnome-clipboard [daemon|toggle]"
 
 
-class ClipboardHistoryApp(Gtk.Application):
+class GnomeClipboardApp(Gtk.Application):
     def __init__(self):
         super().__init__(application_id=APP_ID, flags=Gio.ApplicationFlags.HANDLES_COMMAND_LINE)
         self.storage = None
@@ -67,10 +67,10 @@ def main(argv=None):
     # GTK uses the program name as WM_CLASS on X11: match the .desktop file's
     # StartupWMClass so GNOME Shell shows the app icon and name.
     GLib.set_prgname(APP_ID)
-    app = ClipboardHistoryApp()
+    app = GnomeClipboardApp()
     if len(argv) == 2 and argv[1] == "toggle":
         app.register(None)
         if not app.get_is_remote():
-            print("clipboard-history: daemon not running (systemctl --user start clipboard-history)", file=sys.stderr)
+            print("gnome-clipboard: daemon not running (systemctl --user start gnome-clipboard)", file=sys.stderr)
             return 1
     return app.run(argv)

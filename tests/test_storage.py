@@ -2,7 +2,7 @@ import itertools
 
 import pytest
 
-from clipboard_history.storage import Storage, content_hash
+from gnome_clipboard.storage import Storage, content_hash
 
 
 @pytest.fixture

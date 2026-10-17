@@ -70,7 +70,7 @@ class ClipboardMonitor:
         try:
             sink.splice_finish(result)
         except GLib.Error as e:
-            print(f"clipboard-history: reading image failed: {e.message}", file=sys.stderr)
+            print(f"gnome-clipboard: reading image failed: {e.message}", file=sys.stderr)
             return
         png = sink.steal_as_bytes().get_data()
         if not png or self._is_self_written(content_hash(png)):

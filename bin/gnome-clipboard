@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Entry point: `clipboard-history [daemon|toggle]`."""
+"""Entry point: `gnome-clipboard [daemon|toggle]`."""
 import os
 import sys
 
@@ -7,7 +7,7 @@ import sys
 ROOT = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
 sys.path.insert(0, ROOT)
 
-from clipboard_history import app  # noqa: E402
+from gnome_clipboard import app  # noqa: E402
 
 if __name__ == "__main__":
     sys.exit(app.main(sys.argv))

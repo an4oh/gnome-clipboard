@@ -38,7 +38,7 @@ def content_hash(data: bytes) -> str:
 
 def default_data_dir() -> Path:
     base = os.environ.get("XDG_DATA_HOME") or os.path.expanduser("~/.local/share")
-    return Path(base) / "clipboard-history"
+    return Path(base) / "gnome-clipboard"
 
 
 @dataclass

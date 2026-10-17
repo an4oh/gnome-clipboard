@@ -1,19 +1,19 @@
 #!/usr/bin/env bash
-# Install clipboard-history for the current user (idempotent).
+# Install gnome-clipboard for the current user (idempotent).
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$(readlink -f "$0")")" && pwd)"
 BIN_DIR="$HOME/.local/bin"
-BIN="$BIN_DIR/clipboard-history"
+BIN="$BIN_DIR/gnome-clipboard"
 UNIT_DIR="$HOME/.config/systemd/user"
-UNIT="$UNIT_DIR/clipboard-history.service"
-APP_ID="org.an4oh.ClipboardHistory"
+UNIT="$UNIT_DIR/gnome-clipboard.service"
+APP_ID="org.an4oh.GnomeClipboard"
 APPS_DIR="$HOME/.local/share/applications"
 ICON_ROOT="$HOME/.local/share/icons/hicolor"
 ICON_DIR="$ICON_ROOT/scalable/apps"
 
 MK_SCHEMA="org.gnome.settings-daemon.plugins.media-keys"
-KB_PATH="/org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/custom-clipboard-history/"
+KB_PATH="/org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/custom-gnome-clipboard/"
 KB_SCHEMA="$MK_SCHEMA.custom-keybinding:$KB_PATH"
 
 for cmd in python3 xdotool systemctl gsettings; do
@@ -42,8 +42,8 @@ PY
 
 echo "-> linking $BIN"
 mkdir -p "$BIN_DIR"
-chmod +x "$ROOT/bin/clipboard-history"
-ln -sfn "$ROOT/bin/clipboard-history" "$BIN"
+chmod +x "$ROOT/bin/gnome-clipboard"
+ln -sfn "$ROOT/bin/gnome-clipboard" "$BIN"
 
 echo "-> installing desktop entry and icon"
 mkdir -p "$APPS_DIR" "$ICON_DIR"
@@ -60,12 +60,12 @@ echo "-> writing $UNIT"
 mkdir -p "$UNIT_DIR"
 cat > "$UNIT" <<UNIT
 [Unit]
-Description=Clipboard history daemon (Super+V popup)
+Description=GNOME Clipboard daemon (Super+V popup)
 After=graphical-session.target
 PartOf=graphical-session.target
 
 [Service]
-ExecStart=%h/.local/bin/clipboard-history daemon
+ExecStart=%h/.local/bin/gnome-clipboard daemon
 Restart=on-failure
 RestartSec=2
 
@@ -82,9 +82,16 @@ if [ ${#vars[@]} -gt 0 ]; then
     systemctl --user import-environment "${vars[@]}"
 fi
 
+OLD_DATA="$HOME/.local/share/clipboard-history"
+NEW_DATA="$HOME/.local/share/gnome-clipboard"
+if [ -d "$OLD_DATA" ] && [ ! -e "$NEW_DATA" ]; then
+    echo "-> migrating data $OLD_DATA -> $NEW_DATA"
+    mv "$OLD_DATA" "$NEW_DATA"
+fi
+
 systemctl --user daemon-reload
-systemctl --user enable clipboard-history.service
-systemctl --user restart clipboard-history.service
+systemctl --user enable gnome-clipboard.service
+systemctl --user restart gnome-clipboard.service
 
 echo "-> configuring Super+V"
 tray="$(gsettings get org.gnome.shell.keybindings toggle-message-tray)"
@@ -92,7 +99,7 @@ gsettings set org.gnome.shell.keybindings toggle-message-tray "$(gv_list "$tray"
 
 customs="$(gsettings get "$MK_SCHEMA" custom-keybindings)"
 gsettings set "$MK_SCHEMA" custom-keybindings "$(gv_list "$customs" add "$KB_PATH")"
-gsettings set "$KB_SCHEMA" name "Clipboard history"
+gsettings set "$KB_SCHEMA" name "GNOME Clipboard"
 gsettings set "$KB_SCHEMA" command "$BIN toggle"
 gsettings set "$KB_SCHEMA" binding "<Super>v"
 

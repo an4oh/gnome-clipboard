@@ -24,7 +24,7 @@ WIDTH, HEIGHT = 360, 480
 MIN_WIDTH, MIN_HEIGHT = 240, 200
 THUMB_W, THUMB_H = 320, 120
 PASTE_DELAY_MS = 80
-APP_ICON = "org.an4oh.ClipboardHistory"
+APP_ICON = "org.an4oh.GnomeClipboard"
 # Fallback in case the surface "mapped" notification never arrives.
 PLACE_FALLBACK_MS = 150
 # Mutter places a newly mapped window on its own schedule and may override an
@@ -438,7 +438,7 @@ class PopupWindow(Gtk.Window):
             picture.set_halign(Gtk.Align.START)
             return picture
         except GLib.Error as e:
-            print(f"clipboard-history: cannot load {path}: {e.message}", file=sys.stderr)
+            print(f"gnome-clipboard: cannot load {path}: {e.message}", file=sys.stderr)
             return Gtk.Label(label="[immagine non disponibile]", xalign=0)
 
     # --- actions -----------------------------------------------------------
@@ -505,7 +505,7 @@ class PopupWindow(Gtk.Window):
             try:
                 texture = Gdk.Texture.new_from_filename(item.image_path)
             except GLib.Error as e:
-                print(f"clipboard-history: cannot load {item.image_path}: {e.message}", file=sys.stderr)
+                print(f"gnome-clipboard: cannot load {item.image_path}: {e.message}", file=sys.stderr)
                 return
             value = GObject.Value(Gdk.Texture, texture)
         else:

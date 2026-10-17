@@ -9,7 +9,7 @@ TIMEOUT = 3
 
 
 def _log(msg):
-    print(f"clipboard-history: {msg}", file=sys.stderr, flush=True)
+    print(f"gnome-clipboard: {msg}", file=sys.stderr, flush=True)
 
 
 def _run(*args):

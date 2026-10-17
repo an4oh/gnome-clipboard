@@ -1,11 +1,11 @@
-# clipboard-history
+# gnome-clipboard
 
 Windows-style clipboard history (Win+V) for GNOME on X11. A daemon records every
 text or image you copy; `Super+V` opens a popup with the latest items. Click or
 press Enter to paste into the active window. Items can be pinned, deleted or
 searched. The 25 most recent unpinned items are kept; pinned items never expire.
 
-Data lives in `~/.local/share/clipboard-history/`.
+Data lives in `~/.local/share/gnome-clipboard/`.
 
 ## Requirements
 
@@ -35,7 +35,7 @@ Other distros and versions may work but are untested.
 ./install.sh
 ```
 
-Installs a systemd user service `clipboard-history.service`, links the command
+Installs a systemd user service `gnome-clipboard.service`, links the command
 into `~/.local/bin`, adds the app icon, and binds `Super+V` to the popup (taking
 it from the notification tray; `Super+M` still opens that). Idempotent.
 
