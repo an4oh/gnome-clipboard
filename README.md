@@ -1,18 +1,33 @@
 # clipboard-history
 
 Windows-style clipboard history (Win+V) for GNOME on X11. A daemon records every
-text or image you copy; `Super+V` opens a popup near the pointer with the latest
-items. Click or press Enter to paste into the active window. You can pin, delete
-or search items, and clear all unpinned ones. The 25 most recent unpinned items
-are kept; pinned items never expire.
+text or image you copy; `Super+V` opens a popup with the latest items. Click or
+press Enter to paste into the active window. Items can be pinned, deleted or
+searched. The 25 most recent unpinned items are kept; pinned items never expire.
 
-Data is stored in `~/.local/share/clipboard-history/` (`history.db` and `images/`).
+Data lives in `~/.local/share/clipboard-history/`.
 
 ## Requirements
 
-- Ubuntu/GNOME in an **X11** session
-- `python3-gi`, `gir1.2-gtk-4.0`, `xdotool` (no pip dependencies)
-- `xclip` (optional, needed by terminal apps such as Claude Code to read images from the clipboard)
+- GNOME in an **X11** session (Wayland is not supported, see below)
+- Python 3 with PyGObject and GTK 4: `python3-gi`, `gir1.2-gtk-4.0`
+- `xdotool`
+- `xclip` (optional, lets terminal apps such as Claude Code read copied images)
+
+No pip dependencies. On Ubuntu/Debian:
+
+```sh
+sudo apt install python3-gi gir1.2-gtk-4.0 xdotool xclip
+```
+
+## Tested on
+
+Only one setup so far:
+
+- Ubuntu 24.04.5 LTS, GNOME Shell 46.0, X11 session
+- Python 3.12.3, GTK 4.14.5, PyGObject 3.48.2, xdotool 3.20160805.1
+
+Other distros and versions may work but are untested.
 
 ## Install
 
@@ -20,24 +35,11 @@ Data is stored in `~/.local/share/clipboard-history/` (`history.db` and `images/
 ./install.sh
 ```
 
-Links `bin/clipboard-history` into `~/.local/bin`, installs and starts the user
-service `clipboard-history.service`, and moves `Super+V` from the notification
-tray (`Super+M` stays) to a custom shortcut "Clipboard history". It also
-installs `data/org.an4oh.ClipboardHistory.desktop` into
-`~/.local/share/applications` and its SVG icon into
-`~/.local/share/icons/hicolor/scalable/apps`, so the dash shows the app icon.
-The script is idempotent.
+Installs a systemd user service `clipboard-history.service`, links the command
+into `~/.local/bin`, adds the app icon, and binds `Super+V` to the popup (taking
+it from the notification tray; `Super+M` still opens that). Idempotent.
 
-Manual use: `clipboard-history daemon` (default) or `clipboard-history toggle`.
-
-## Uninstall
-
-```sh
-./uninstall.sh
-```
-
-Stops and removes the service, the link and the shortcut, and gives `Super+V`
-back to the notification tray. Clipboard history on disk is kept.
+`./uninstall.sh` reverts everything except the stored history.
 
 ## Tests
 
@@ -45,11 +47,10 @@ back to the notification tray. Clipboard history on disk is kept.
 python3 -m pytest tests/ -q
 ```
 
-## Wayland limitation
+## Wayland
 
-On Wayland automatic pasting does not work: `xdotool` cannot activate windows or
-send Ctrl+V, and the popup cannot be positioned. This is not handled; X11 is the
-only supported session.
+On Wayland `xdotool` cannot focus windows or send Ctrl+V, so automatic pasting
+does not work. Not handled: X11 is the only supported session.
 
 ## License
 
