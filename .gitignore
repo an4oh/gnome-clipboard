@@ -1,3 +1,10 @@
 __pycache__/
 .pytest_cache/
 *.pyc
+
+# Claude Code / agent tooling (local only)
+CLAUDE.md
+.claude/
+docs/superpowers/
+STATUS.md
+PHASES.md
