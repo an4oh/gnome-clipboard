@@ -1,7 +1,5 @@
 # clipboard-history
 
-**GitHub:** https://github.com/an4oh/clipboard-history
-
 Windows-style clipboard history (Win+V) for GNOME on X11. A daemon records every
 text or image you copy; `Super+V` opens a popup with the latest items. Click or
 press Enter to paste into the active window. Items can be pinned, deleted or
@@ -53,11 +51,6 @@ python3 -m pytest tests/ -q
 
 On Wayland `xdotool` cannot focus windows or send Ctrl+V, so automatic pasting
 does not work. Not handled: X11 is the only supported session.
-
-## Contact
-
-an4oh — [an4oh@proton.me](mailto:an4oh@proton.me). Bugs and ideas: open an issue on
-[GitHub](https://github.com/an4oh/clipboard-history/issues).
 
 ## License
 
